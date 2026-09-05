@@ -11,9 +11,9 @@ on:
         required: false
         default: '1'
       ordersPerDay:
-        description: 'Target orders per day (default: 12)'
+        description: 'Custom orders count (leave empty for dynamic realistic random volume)'
         required: false
-        default: '12'
+        default: ''
 
 jobs:
   simulate-daily-orders:

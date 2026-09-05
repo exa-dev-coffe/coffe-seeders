@@ -10,7 +10,8 @@
     "trigger:vouchers": "node seeders/index.js trigger-vouchers",
     "trigger:promos": "node seeders/index.js trigger-promos",
     "trigger:all": "node seeders/index.js trigger-all",
-    "simulate:daily": "node scripts/simulate_daily_orders.js"
+    "simulate:daily": "node scripts/daily_auto_sim.js",
+    "simulate:multi-day": "node scripts/simulate_daily_orders.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

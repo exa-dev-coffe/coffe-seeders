@@ -48,7 +48,18 @@ Sesuaikan konfigurasi database dan API URL target Anda.
 | `npm run trigger:vouchers` | Mendaftarkan voucher aktif dan membuat pesanan dengan voucher. |
 | `npm run trigger:promos` | Mendaftarkan promo marketing dan membuat transaksi diskon promo. |
 | `npm run trigger:all` | Menjalankan seluruh proses modul `seeders/` secara berurutan. |
-| `npm run simulate:daily` | Mensimulasikan order harian dengan kurva jam sibuk realistis. |
+| `npm run simulate:daily` | Mensimulasikan transaksi kafe harian secara instan. |
+| `npm run simulate:multi-day` | Mensimulasikan order historis multi-hari dengan kurva jam sibuk. |
+
+---
+
+## 🤖 Otomasi CI/CD (GitHub Actions)
+
+Repository ini telah dilengkapi dengan workflow otomasi GitHub Actions ([`.github/workflows/daily-orders-simulation.yml`](.github/workflows/daily-orders-simulation.yml)):
+- **Jadwal Otomatis (Cron)**: Berjalan setiap hari pada jam **23.00 WIB / 16.00 UTC** (`0 16 * * *`).
+- **Tujuan**: Menginjeksi pesanan-pesanan baru setiap hari secara otomatis sehingga dashboard penjualan dan analitik web app portofolio Anda ([coffe.eka-dev.cloud](https://coffe.eka-dev.cloud)) selalu memiliki data transaksi hari ini dan selalu terlihat hidup.
+- **Manual Trigger (Workflow Dispatch)**: Dapat dijalankan kapan saja melalui tab **Actions** di GitHub dengan opsi menentukan jumlah hari (`days`) dan jumlah order per hari (`ordersPerDay`).
+- **Reporting**: Otomatis membuat ringkasan tabel eksekusi Markdown di GitHub Actions Step Summary.
 
 ---
 

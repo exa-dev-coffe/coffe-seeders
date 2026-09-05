@@ -1,0 +1,44 @@
+name: ☕ Daily Coffee Orders Simulation
+
+on:
+  schedule:
+    # Runs everyday at 16:00 UTC (23:00 WIB / 11 PM Jakarta Time)
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days to simulate (default: 1 for today)'
+        required: false
+        default: '1'
+      ordersPerDay:
+        description: 'Target orders per day (default: 12)'
+        required: false
+        default: '12'
+
+jobs:
+  simulate-daily-orders:
+    name: Run Daily Orders Simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install --omit=dev
+
+      - name: Execute Daily Order Simulation
+        env:
+          DB_MASTER_URL: ${{ secrets.DB_MASTER_URL }}
+          DB_TX_URL: ${{ secrets.DB_TX_URL }}
+          DB_WALLET_URL: ${{ secrets.DB_WALLET_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          SECRET_JWT: ${{ secrets.SECRET_JWT }}
+          DAYS: ${{ github.event.inputs.days || '1' }}
+          ORDERS_PER_DAY: ${{ github.event.inputs.ordersPerDay || '12' }}
+        run: node scripts/daily_auto_sim.js

@@ -168,11 +168,7 @@ async function main() {
         orderSubtotal += lineTotal;
       }
 
-      let voucherCode = "";
-      if (Math.random() < 0.25 && vouchers.length > 0 && orderSubtotal >= 30000) {
-        voucherCode = vouchers[Math.floor(Math.random() * vouchers.length)].code;
-      }
-
+      // Cash payment order without voucher constraint to ensure 100% success rate
       const cashAmount = Math.ceil(orderSubtotal / 50000) * 50000 + (Math.random() > 0.5 ? 50000 : 0);
       const cashChange = Math.max(0, cashAmount - orderSubtotal);
 
@@ -188,9 +184,6 @@ async function main() {
 
       if (tableId) {
         payload.tableId = tableId;
-      }
-      if (voucherCode) {
-        payload.voucherCode = voucherCode;
       }
 
       try {

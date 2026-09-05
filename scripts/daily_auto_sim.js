@@ -217,11 +217,14 @@ async function main() {
         ? Math.floor(Math.random() * 2) + 3
         : Math.floor(Math.random() * 2) + 5;
 
+      // Pick distinct products per order (prevent duplicate IDs in single checkout)
+      const shuffled = [...products].sort(() => 0.5 - Math.random());
+      const selectedProds = shuffled.slice(0, Math.min(itemCount, shuffled.length));
+
       let orderSubtotal = 0;
       const orderDatas = [];
 
-      for (let k = 0; k < itemCount; k++) {
-        const prod = products[Math.floor(Math.random() * products.length)];
+      for (const prod of selectedProds) {
         const qty = Math.floor(Math.random() * 2) + 1;
         const lineTotal = prod.price * qty;
         const note = Math.random() > 0.65 ? NOTES[Math.floor(Math.random() * NOTES.length)] : "";

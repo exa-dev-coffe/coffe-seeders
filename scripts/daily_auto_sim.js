@@ -145,10 +145,9 @@ async function main() {
 
     for (let i = 0; i < dailyTarget; i++) {
       const custName = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
-      const isTakeaway = Math.random() > 0.65;
+      const isTakeaway = Math.random() > 0.6;
       const orderType = isTakeaway ? "TAKEAWAY" : "DINE_IN";
-      const tableId = isTakeaway ? null : tables[Math.floor(Math.random() * tables.length)];
-      const paymentMethod = PAYMENT_METHODS[Math.floor(Math.random() * PAYMENT_METHODS.length)];
+      const tableId = orderType === "DINE_IN" ? (tables[Math.floor(Math.random() * tables.length)] || 1) : null;
 
       const itemCount = Math.floor(Math.random() * 3) + 1;
       let orderSubtotal = 0;
@@ -163,7 +162,8 @@ async function main() {
           menuId: prod.id,
           qty,
           price: prod.price,
-          total: lineTotal
+          total: lineTotal,
+          notes: Math.random() > 0.6 ? "Less sugar" : ""
         });
         orderSubtotal += lineTotal;
       }
@@ -173,13 +173,13 @@ async function main() {
         voucherCode = vouchers[Math.floor(Math.random() * vouchers.length)].code;
       }
 
-      const cashAmount = paymentMethod === "CASH" ? Math.ceil(orderSubtotal / 50000) * 50000 : orderSubtotal;
-      const cashChange = paymentMethod === "CASH" ? cashAmount - orderSubtotal : 0;
+      const cashAmount = Math.ceil(orderSubtotal / 50000) * 50000 + (Math.random() > 0.5 ? 50000 : 0);
+      const cashChange = Math.max(0, cashAmount - orderSubtotal);
 
       const payload = {
         orderType,
         orderFor: custName,
-        paymentMethod,
+        paymentMethod: "CASH",
         cashAmount,
         cashChange,
         datas: orderDatas,

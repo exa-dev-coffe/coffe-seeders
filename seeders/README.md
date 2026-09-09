@@ -86,9 +86,10 @@ cd coffe-fe && npm run trigger:all
 ---
 
 ## 🌐 Mappings Service & Database
-
-Script ini akan otomatis mendeteksi service backend lokal:
-- **Master Data Service**: `http://localhost:8081` (atau Kong Gateway `http://localhost:8000`)
-- **Transaction Service**: `http://localhost:8084`
-- **Wallet Service**: `http://localhost:8082`
-- **PostgreSQL Database**: `postgres://root:password@localhost:10000/transaction` & `wallet`
+ 
+Script ini membaca konfigurasi koneksi dari file `.env` atau environment variables:
+- **Master Data Service**: `MASTER_DATA_URL` (default: Gateway `http://localhost:8000` / `http://localhost:8081`)
+- **Transaction Service**: `TRANSACTION_URL` (default: `http://localhost:8084`)
+- **Wallet Service**: `WALLET_URL` (default: `http://localhost:8082`)
+- **PostgreSQL Database URLs**: `DB_TRANSACTION_URL`, `DB_WALLET_URL`, `DB_MASTER_URL`
+- **JWT Secret**: `SECRET_JWT` (disimpan di `.env`)

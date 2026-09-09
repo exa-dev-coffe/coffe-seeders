@@ -1,15 +1,48 @@
 /**
  * Reset & Seed Portfolio Data (Master Data + 2 Years of Historical Orders: 2025 - 2026)
- * Configurable via environment variables (see .env.example)
  */
 
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+
+// Auto-load environment variables from .env files if present
+function loadEnv() {
+  const envCandidates = [
+    path.resolve(__dirname, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../seeders/.env")
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const fileContent = fs.readFileSync(envPath, "utf8");
+        for (const line of fileContent.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+loadEnv();
+
 const { Client } = require("pg");
 
 const DB_CONFIG = {
-  masterData: process.env.DB_MASTER_URL || "postgres://postgres:password@localhost:5432/master_data?sslmode=disable",
-  transaction: process.env.DB_TX_URL || "postgres://postgres:password@localhost:5432/transaction?sslmode=disable",
-  wallet: process.env.DB_WALLET_URL || "postgres://postgres:password@localhost:5432/wallet?sslmode=disable",
+  masterData: process.env.DB_MASTER_URL || "postgres://user:password@localhost:5432/master_data?sslmode=disable",
+  transaction: process.env.DB_TRANSACTION_URL || process.env.DB_TX_URL || "postgres://user:password@localhost:5432/transaction?sslmode=disable",
+  wallet: process.env.DB_WALLET_URL || "postgres://user:password@localhost:5432/wallet?sslmode=disable",
 };
 
 const CATEGORIES = [

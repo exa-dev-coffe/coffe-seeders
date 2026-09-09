@@ -10,9 +10,43 @@
  *   node seeders/index.js trigger-all [--days=7] [--ordersPerDay=10]
  */
 
+const fs = require("fs");
+const path = require("path");
 const crypto = require("crypto");
 const { seedProducts } = require("./products");
 const { triggerNormalOrders, triggerVoucherOrders, triggerDiscountOrders } = require("./orders");
+
+// Auto-load environment variables from .env files if present
+function loadEnv() {
+  const envCandidates = [
+    path.resolve(__dirname, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../transaction-service/.env")
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const fileContent = fs.readFileSync(envPath, "utf8");
+        for (const line of fileContent.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+loadEnv();
 
 let Client = null;
 try {
@@ -25,7 +59,7 @@ const BASE_URL = process.env.API_URL || "http://localhost:8000";
 const JWT_SECRET =
   process.env.SECRET_JWT ||
   process.env.APP_JWT_SECRET ||
-  "8hZjEKzG36uOXxJjl8bRtB4KmaZuZ1eJ7DmcKQXMU533wub1Kjq9SXEru3cNnU0ATZsm/m2V0Vcw0zC8r2wegA==";
+  "your_jwt_secret_key_here";
 
 const PORTS = {
   auth: process.env.AUTH_URL || `${BASE_URL}`,
@@ -158,11 +192,13 @@ async function request(baseUrl, path, options = {}) {
 }
 
 async function getPgClients() {
-  if (!Client) return { pgClientTx: null, pgClientWallet: null };
-  const txDbUrl = process.env.DB_TRANSACTION_URL || "postgres://root:password@localhost:10000/transaction?sslmode=disable";
-  const walletDbUrl = process.env.DB_WALLET_URL || "postgres://root:password@localhost:10000/wallet?sslmode=disable";
+  if (!Client) return { pgClientTx: null, pgClientWallet: null, pgClientMaster: null };
+  const txDbUrl = process.env.DB_TRANSACTION_URL || "postgres://user:password@localhost:5432/transaction?sslmode=disable";
+  const walletDbUrl = process.env.DB_WALLET_URL || "postgres://user:password@localhost:5432/wallet?sslmode=disable";
+  const masterDbUrl = process.env.DB_MASTER_URL || "postgres://user:password@localhost:5432/db_master_data?sslmode=disable";
   let pgClientTx = null;
   let pgClientWallet = null;
+  let pgClientMaster = null;
 
   try {
     pgClientTx = new Client({ connectionString: txDbUrl });
@@ -176,8 +212,14 @@ async function getPgClients() {
   } catch {
     pgClientWallet = null;
   }
+  try {
+    pgClientMaster = new Client({ connectionString: masterDbUrl });
+    await pgClientMaster.connect();
+  } catch {
+    pgClientMaster = null;
+  }
 
-  return { pgClientTx, pgClientWallet };
+  return { pgClientTx, pgClientWallet, pgClientMaster };
 }
 
 async function main() {

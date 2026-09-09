@@ -13,6 +13,40 @@
 
 const crypto = require("crypto");
 
+const fs = require("fs");
+const path = require("path");
+
+function loadEnv() {
+  const envCandidates = [
+    path.resolve(__dirname, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../seeders/.env")
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const fileContent = fs.readFileSync(envPath, "utf8");
+        for (const line of fileContent.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+loadEnv();
+
 let Client = null;
 try {
   Client = require("pg").Client;
@@ -24,7 +58,7 @@ const BASE_URL = process.env.API_URL || "http://localhost:8000";
 const JWT_SECRET =
   process.env.SECRET_JWT ||
   process.env.APP_JWT_SECRET ||
-  "8hZjEKzG36uOXxJjl8bRtB4KmaZuZ1eJ7DmcKQXMU533wub1Kjq9SXEru3cNnU0ATZsm/m2V0Vcw0zC8r2wegA==";
+  "your_jwt_secret_key_here";
 
 const PORTS = {
   auth: process.env.AUTH_URL || `${BASE_URL}`,
@@ -196,8 +230,8 @@ async function main() {
   let pgClientWallet = null;
 
   if (Client) {
-    const txDbUrl = process.env.DB_TRANSACTION_URL || "postgres://root:password@localhost:10000/transaction?sslmode=disable";
-    const walletDbUrl = process.env.DB_WALLET_URL || "postgres://root:password@localhost:10000/wallet?sslmode=disable";
+    const txDbUrl = process.env.DB_TRANSACTION_URL || "postgres://user:password@localhost:5432/transaction?sslmode=disable";
+    const walletDbUrl = process.env.DB_WALLET_URL || "postgres://user:password@localhost:5432/wallet?sslmode=disable";
 
     try {
       pgClientTx = new Client({ connectionString: txDbUrl });
@@ -273,25 +307,31 @@ async function main() {
         checkoutTotal += itemTotal;
       }
 
-      const tableId = tableIds.length > 0 ? tableIds[Math.floor(Math.random() * tableIds.length)] : 1;
+      const isTakeaway = Math.random() > 0.55;
+      const orderType = isTakeaway ? "TAKEAWAY" : "DINE_IN";
+      const tableId = isTakeaway ? null : (tableIds.length > 0 ? tableIds[Math.floor(Math.random() * tableIds.length)] : 1);
+      const orderFor = cust.name;
 
-      // First attempt API checkout
+      // First attempt API checkout via POS endpoint
       let txId = null;
       try {
-        const checkoutRes = await request(PORTS.transaction, "/api/1.0/checkout", {
+        const checkoutRes = await request(PORTS.transaction, "/api/1.0/pos/checkout", {
           method: "POST",
-          headers: custHeaders,
+          headers: adminHeaders,
           body: JSON.stringify({
             tableId: tableId,
-            orderFor: "DINE_IN",
-            pin: "123456",
+            orderType: orderType,
+            paymentMethod: "CASH",
+            orderFor: orderFor,
+            cashAmount: checkoutTotal,
+            cashChange: 0,
             datas: orderDatas,
             total: checkoutTotal
           })
         });
-        txId = checkoutRes.data?.id || checkoutRes.data;
+        txId = checkoutRes.data?.id || checkoutRes.data?.data?.id;
       } catch {
-        // If API checkout fails (e.g. wallet service not connected), insert directly into Postgres DB!
+        // If API checkout fails, insert directly into Postgres DB!
         if (pgClientTx) {
           try {
             const hour = getRandomCafeHour();
@@ -300,18 +340,28 @@ async function main() {
             const txTimestamp = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), hour, minute, second).toISOString();
 
             const dbRes = await pgClientTx.query(
-              `INSERT INTO th_user_checkouts (user_id, table_id, order_for, total_price, order_status, created_by, created_at, updated_at) 
-               VALUES ($1, $2, $3, $4, 2, $5, $6, $6) RETURNING id`,
-              [cust.id, tableId, "DINE_IN", checkoutTotal, cust.id, txTimestamp]
+              `INSERT INTO th_user_checkouts (
+                user_id, table_id, order_for, total_price, order_status, 
+                created_by, created_at, updated_at, updated_by,
+                order_type, payment_method, payment_status, cash_amount, cash_change, is_cashier
+              ) VALUES (
+                $1, $2, $3, $4, 2, 
+                $5, $6, $6, $5,
+                $7, 'CASH', 'PAID', $8, 0, true
+              ) RETURNING id`,
+              [cust.id, tableId, orderFor, checkoutTotal, cust.id, txTimestamp, orderType, checkoutTotal]
             );
 
             txId = dbRes.rows[0]?.id;
             if (txId) {
               for (const d of orderDatas) {
+                const rating = Math.random() > 0.25 ? (Math.random() > 0.4 ? 5 : 4) : 3;
                 await pgClientTx.query(
-                  `INSERT INTO td_user_checkouts (ref_id, menu_id, qty, price, total_price, notes, created_by, created_at, updated_at) 
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
-                  [txId, d.menuId, d.qty, d.price, d.total, d.notes, cust.id, txTimestamp]
+                  `INSERT INTO td_user_checkouts (
+                    ref_id, menu_id, qty, price, total_price, rating, notes, 
+                    created_by, created_at, updated_at, updated_by
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $8)`,
+                  [txId, d.menuId, d.qty, d.price, d.total, rating, d.notes, cust.id, txTimestamp]
                 );
               }
             }
@@ -322,7 +372,7 @@ async function main() {
       }
 
       if (txId) {
-        // If PostgreSQL direct client is available, backdate transaction timestamp to target historical date!
+        // If PostgreSQL direct client is available, backdate transaction timestamp to target historical date and set order_status = 2!
         if (pgClientTx) {
           const hour = getRandomCafeHour();
           const minute = Math.floor(Math.random() * 60);
@@ -330,9 +380,24 @@ async function main() {
           const txTimestamp = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), hour, minute, second).toISOString();
 
           await pgClientTx.query(
-            "UPDATE th_user_checkouts SET created_at = $1, order_status = 2 WHERE id = $2",
+            "UPDATE th_user_checkouts SET created_at = $1, updated_at = $1, order_status = 2 WHERE id = $2",
             [txTimestamp, txId]
           );
+        } else {
+          try {
+            await request(PORTS.transaction, "/api/1.0/transactions/update-order-status", {
+              method: "PATCH",
+              headers: adminHeaders,
+              body: JSON.stringify({ id: txId })
+            });
+            await request(PORTS.transaction, "/api/1.0/transactions/update-order-status", {
+              method: "PATCH",
+              headers: adminHeaders,
+              body: JSON.stringify({ id: txId })
+            });
+          } catch {
+            // ignore
+          }
         }
 
         dailyRevenue += checkoutTotal;

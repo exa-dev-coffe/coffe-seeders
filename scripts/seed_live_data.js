@@ -9,13 +9,47 @@
  *   Uses dual HS512/HS256 local HMAC JWT generation + real API login fallback.
  */
 
+const fs = require("fs");
+const path = require("path");
 const crypto = require("crypto");
+
+// Auto-load environment variables from .env files if present
+function loadEnv() {
+  const envCandidates = [
+    path.resolve(__dirname, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../seeders/.env")
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const fileContent = fs.readFileSync(envPath, "utf8");
+        for (const line of fileContent.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+loadEnv();
 
 const BASE_URL = process.env.API_URL || "http://localhost:8000";
 const JWT_SECRET =
   process.env.SECRET_JWT ||
   process.env.APP_JWT_SECRET ||
-  "8hZjEKzG36uOXxJjl8bRtB4KmaZuZ1eJ7DmcKQXMU533wub1Kjq9SXEru3cNnU0ATZsm/m2V0Vcw0zC8r2wegA==";
+  "your_jwt_secret_key_here";
 
 const PORTS = {
   auth: process.env.AUTH_URL || `${BASE_URL}`,

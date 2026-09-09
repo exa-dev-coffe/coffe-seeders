@@ -13,12 +13,45 @@ try {
   // dotenv is optional
 }
 const fs = require("fs");
+const path = require("path");
 const crypto = require("crypto");
+
+// Auto-load environment variables from .env files if present
+function loadEnv() {
+  const envCandidates = [
+    path.resolve(__dirname, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../seeders/.env")
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const fileContent = fs.readFileSync(envPath, "utf8");
+        for (const line of fileContent.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+loadEnv();
 
 const API_URL = (process.env.API_URL || "https://api-coffe.eka-dev.cloud").replace(/\/+$/, "");
 const JWT_SECRET =
   process.env.SECRET_JWT ||
-  "8hZjEKzG36uOXxJjl8bRtB4KmaZuZ1eJ7DmcKQXMU533wub1Kjq9SXEru3cNnU0ATZsm/m2V0Vcw0zC8r2wegA==";
+  "your_jwt_secret_key_here";
 
 const rawArgs = process.argv.slice(2).reduce((acc, arg) => {
   const [key, val] = arg.replace(/^--/, "").split("=");
@@ -256,11 +289,26 @@ async function main() {
         payload.tableId = tableId;
       }
 
-      try {
-        await apiRequest("/api/1.0/pos/checkout", {
+        const res = await apiRequest("/api/1.0/pos/checkout", {
           method: "POST",
           body: JSON.stringify(payload)
         }, adminToken);
+
+        const orderId = res?.data?.id;
+        if (orderId) {
+          try {
+            await apiRequest("/api/1.0/transactions/update-order-status", {
+              method: "PATCH",
+              body: JSON.stringify({ id: orderId })
+            }, adminToken);
+            await apiRequest("/api/1.0/transactions/update-order-status", {
+              method: "PATCH",
+              body: JSON.stringify({ id: orderId })
+            }, adminToken);
+          } catch {
+            // ignore
+          }
+        }
 
         dailyOrders++;
         dailyRevenue += orderSubtotal;

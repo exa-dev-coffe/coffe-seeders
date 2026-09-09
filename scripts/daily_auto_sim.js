@@ -48,7 +48,7 @@ function loadEnv() {
 }
 loadEnv();
 
-const API_URL = (process.env.API_URL || "https://api-coffe.eka-dev.cloud").replace(/\/+$/, "");
+let API_URL = (process.env.API_URL || "https://api-coffe.eka-dev.cloud").replace(/\/+$/, "");
 const JWT_SECRET =
   process.env.SECRET_JWT ||
   "your_jwt_secret_key_here";
@@ -60,7 +60,7 @@ const rawArgs = process.argv.slice(2).reduce((acc, arg) => {
 }, {});
 
 const DAYS = parseInt(process.env.DAYS || rawArgs.days || 1, 10);
-const FORCED_ORDERS = rawArgs.ordersPerDay ? parseInt(rawArgs.ordersPerDay, 10) : null;
+const FORCED_ORDERS = (rawArgs.ordersPerDay || process.env.ORDERS_PER_DAY) ? parseInt(rawArgs.ordersPerDay || process.env.ORDERS_PER_DAY, 10) : null;
 
 const CUSTOMERS = [
   "Budi Santoso",
@@ -187,6 +187,22 @@ function getDailyTraffic(targetDate) {
 }
 
 async function main() {
+  // If API_URL points to localhost, check connectivity; fallback to live cloud if offline
+  if (API_URL.includes("localhost") || API_URL.includes("127.0.0.1")) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500);
+      const testRes = await fetch(`${API_URL}/api/1.0/menus`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!testRes.ok && testRes.status >= 500) {
+        throw new Error(`Server returned ${testRes.status}`);
+      }
+    } catch {
+      console.log(`ℹ️ Local endpoint (${API_URL}) is offline. Automatically falling back to live API: https://api-coffe.eka-dev.cloud`);
+      API_URL = "https://api-coffe.eka-dev.cloud";
+    }
+  }
+
   console.log("==================================================================");
   console.log(`☕ DYNAMIC DAILY CAFE ORDERS SIMULATION`);
   console.log(`   Target Endpoint: ${API_URL}`);
@@ -289,6 +305,7 @@ async function main() {
         payload.tableId = tableId;
       }
 
+      try {
         const res = await apiRequest("/api/1.0/pos/checkout", {
           method: "POST",
           body: JSON.stringify(payload)

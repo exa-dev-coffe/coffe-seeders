@@ -40,5 +40,5 @@ jobs:
           API_URL: ${{ secrets.API_URL }}
           SECRET_JWT: ${{ secrets.SECRET_JWT }}
           DAYS: ${{ github.event.inputs.days || '1' }}
-          ORDERS_PER_DAY: ${{ github.event.inputs.ordersPerDay || '12' }}
+          ORDERS_PER_DAY: ${{ github.event.inputs.ordersPerDay || '' }}
         run: node scripts/daily_auto_sim.js

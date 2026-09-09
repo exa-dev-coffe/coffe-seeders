@@ -54,13 +54,13 @@ try {
   // pg is optional
 }
 
-const BASE_URL = process.env.API_URL || "http://localhost:8000";
+let BASE_URL = process.env.API_URL || "http://localhost:8000";
 const JWT_SECRET =
   process.env.SECRET_JWT ||
   process.env.APP_JWT_SECRET ||
   "your_jwt_secret_key_here";
 
-const PORTS = {
+let PORTS = {
   auth: process.env.AUTH_URL || `${BASE_URL}`,
   masterData: process.env.MASTER_DATA_URL || `${BASE_URL}`,
   transaction: process.env.TRANSACTION_URL || `${BASE_URL}`,
@@ -189,8 +189,27 @@ function getRandomCafeHour() {
 }
 
 async function main() {
+  if (BASE_URL.includes("localhost") || BASE_URL.includes("127.0.0.1")) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500);
+      const testRes = await fetch(`${BASE_URL}/api/1.0/menus`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!testRes.ok && testRes.status >= 500) {
+        throw new Error(`Server returned ${testRes.status}`);
+      }
+    } catch {
+      console.log(`ℹ️ Local endpoint (${BASE_URL}) is offline. Automatically falling back to live API: https://api-coffe.eka-dev.cloud`);
+      BASE_URL = "https://api-coffe.eka-dev.cloud";
+      PORTS.auth = BASE_URL;
+      PORTS.masterData = BASE_URL;
+      PORTS.transaction = BASE_URL;
+    }
+  }
+
   console.log("====================================================");
   console.log(`📊 DAILY TRANSACTION SIMULATOR (${DAYS_TO_SIMULATE} DAYS HISTORY)`);
+  console.log(`   Target Endpoint: ${BASE_URL}`);
   console.log("====================================================");
 
   const adminToken = generateJwtToken(1, "admin@gmail.com", "Master Admin", "admin");

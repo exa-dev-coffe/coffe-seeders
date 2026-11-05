@@ -15,6 +15,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { seedProducts } = require("./products");
 const { triggerNormalOrders, triggerVoucherOrders, triggerDiscountOrders } = require("./orders");
+const { seedFinanceAndInventory } = require("./finance_inventory");
 
 // Auto-load environment variables from .env files if present
 function loadEnv() {
@@ -96,14 +97,23 @@ function generateJwtToken(userId, email, fullName, role = "admin") {
     inventory: { view: true, create: true, edit: true, delete: true },
     report: { view: true, create: true, edit: true, delete: true },
     role_management: { view: true, create: true, edit: true, delete: true },
-    user_management: { view: true, create: true, edit: true, delete: true }
+    user_management: { view: true, create: true, edit: true, delete: true },
+    pos: { view: true, create: true, edit: true, delete: true },
+    wallet_management: { view: true, create: true, edit: true, delete: true },
+    purchase_order: { view: true, create: true, edit: true, delete: true },
+    expense: { view: true, create: true, edit: true, delete: true },
+    supplier: { view: true, create: true, edit: true, delete: true },
+    finance: { view: true, create: true, edit: true, delete: true }
   };
 
   const baristaPermissions = {
     catalog: { view: true, create: false, edit: false, delete: false },
     order: { view: true, create: false, edit: true, delete: false },
     inventory: { view: true, create: false, edit: true, delete: false },
-    report: { view: true, create: false, edit: false, delete: false }
+    report: { view: true, create: false, edit: false, delete: false },
+    pos: { view: true, create: true, edit: true, delete: true },
+    purchase_order: { view: true, create: true, edit: false, delete: false },
+    supplier: { view: true, create: false, edit: false, delete: false }
   };
 
   const userPermissions = {};
@@ -237,6 +247,11 @@ async function main() {
       await seedProducts(contextParams);
       break;
 
+    case "seed-finance":
+    case "seed-inventory":
+      await seedFinanceAndInventory(contextParams);
+      break;
+
     case "trigger-normal":
       await triggerNormalOrders(contextParams);
       break;
@@ -252,6 +267,7 @@ async function main() {
     case "trigger-all":
     case "all":
       await seedProducts(contextParams);
+      await seedFinanceAndInventory(contextParams);
       await triggerNormalOrders(contextParams);
       await triggerVoucherOrders(contextParams);
       await triggerDiscountOrders(contextParams);
@@ -261,10 +277,12 @@ async function main() {
       console.log(`
 Available Commands:
   node seeders/index.js seed-products       -> Seed Categories & Products with HD Unsplash Images
+  node seeders/index.js seed-finance        -> Seed Ingredients, Suppliers, Purchase Orders & Expenses
   node seeders/index.js trigger-normal     -> Trigger Normal Orders (No Promo/Voucher)
   node seeders/index.js trigger-vouchers   -> Trigger Orders with Vouchers
   node seeders/index.js trigger-promos     -> Trigger Orders with Marketing Promotions & Discounts
   node seeders/index.js trigger-all        -> Execute All Steps In Sequence
+
 
 CLI Flags:
   --days=7           Number of historical days to simulate (default: 7)
